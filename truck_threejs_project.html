@@ -1,0 +1,1087 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Three.js Truck Project</title>
+  <style>
+    :root {
+      --bg-top: #0c1a26;
+      --bg-bottom: #37566d;
+      --panel: rgba(7, 15, 24, 0.78);
+      --panel-border: rgba(255, 255, 255, 0.14);
+      --text: #f3f5f7;
+      --muted: #b8c2cc;
+      --accent: #ff8757;
+      --accent-2: #7ce0f5;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    html,
+    body {
+      margin: 0;
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      font-family: "Trebuchet MS", "Segoe UI", sans-serif;
+      color: var(--text);
+      background:
+        radial-gradient(circle at 20% 20%, rgba(124, 224, 245, 0.18), transparent 30%),
+        radial-gradient(circle at 80% 15%, rgba(255, 135, 87, 0.14), transparent 28%),
+        linear-gradient(180deg, var(--bg-top), var(--bg-bottom));
+    }
+
+    canvas {
+      display: block;
+      width: 100%;
+      height: 100%;
+    }
+
+    .hud {
+      position: fixed;
+      top: 18px;
+      left: 18px;
+      width: min(360px, calc(100vw - 36px));
+      padding: 16px 18px;
+      border: 1px solid var(--panel-border);
+      border-radius: 18px;
+      background: var(--panel);
+      backdrop-filter: blur(12px);
+      box-shadow: 0 18px 48px rgba(0, 0, 0, 0.28);
+      z-index: 10;
+    }
+
+    .hud h1 {
+      margin: 0 0 8px;
+      font-size: 22px;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+    }
+
+    .hud p {
+      margin: 0 0 10px;
+      font-size: 14px;
+      line-height: 1.5;
+      color: var(--muted);
+    }
+
+    .badges {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin: 12px 0 14px;
+    }
+
+    .badges span {
+      padding: 6px 10px;
+      border-radius: 999px;
+      font-size: 12px;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      color: #fff;
+      background: linear-gradient(135deg, rgba(255, 135, 87, 0.85), rgba(124, 224, 245, 0.8));
+    }
+
+    .controls {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 6px;
+      font-size: 13px;
+      color: var(--text);
+    }
+
+    .controls strong {
+      color: var(--accent-2);
+    }
+
+    .action-row {
+      display: flex;
+      gap: 10px;
+      margin-top: 14px;
+    }
+
+    .horn-button {
+      border: 1px solid rgba(255, 255, 255, 0.18);
+      border-radius: 999px;
+      padding: 10px 16px;
+      font: inherit;
+      font-size: 13px;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: #fff8eb;
+      background: linear-gradient(135deg, rgba(255, 135, 87, 0.92), rgba(161, 63, 31, 0.92));
+      box-shadow: 0 10px 22px rgba(0, 0, 0, 0.24);
+      cursor: pointer;
+      transition: transform 120ms ease, box-shadow 120ms ease, filter 120ms ease;
+    }
+
+    .horn-button:hover {
+      filter: brightness(1.04);
+    }
+
+    .horn-button.active {
+      transform: translateY(1px) scale(0.98);
+      box-shadow: 0 4px 14px rgba(0, 0, 0, 0.2);
+      filter: saturate(1.15) brightness(1.05);
+    }
+
+    code {
+      padding: 1px 6px;
+      border-radius: 999px;
+      background: rgba(255, 255, 255, 0.08);
+      color: #fff4d1;
+      font-family: Consolas, Monaco, monospace;
+    }
+
+    .status {
+      margin-top: 14px;
+      padding-top: 12px;
+      border-top: 1px solid rgba(255, 255, 255, 0.1);
+      font-size: 12px;
+      color: var(--muted);
+      letter-spacing: 0.03em;
+      text-transform: uppercase;
+    }
+
+    @media (max-width: 640px) {
+      .hud {
+        top: 10px;
+        left: 10px;
+        width: calc(100vw - 20px);
+        padding: 14px;
+      }
+
+      .hud h1 {
+        font-size: 18px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="hud">
+    <h1>Freight Truck</h1>
+    <p>
+      Procedural Three.js truck with custom shader materials, dynamic lighting, perspective camera,
+      animated movement, and mouse + keyboard interaction.
+    </p>
+    <div class="badges">
+      <span>Custom Shaders</span>
+      <span>Lighting</span>
+      <span>Textures</span>
+      <span>Animation</span>
+      <span>Interaction</span>
+    </div>
+    <div class="controls">
+      <div><strong>Drive:</strong> <code>W/S</code> or <code>Up/Down</code></div>
+      <div><strong>Steer:</strong> <code>A/D</code> or <code>Left/Right</code></div>
+      <div><strong>Brake:</strong> <code>Space</code></div>
+      <div><strong>Camera:</strong> drag with mouse, wheel to zoom, <code>C</code> toggle auto orbit</div>
+      <div><strong>Light:</strong> <code>L</code> toggle rotating inspection light</div>
+      <div><strong>Horn Smoke:</strong> hold <code>H</code> or press the horn button</div>
+      <div><strong>Reset:</strong> <code>R</code></div>
+    </div>
+    <div class="action-row">
+      <button class="horn-button" id="hornButton" type="button">Horn Smoke</button>
+    </div>
+    <div class="status" id="status">Auto camera: on | Rotating light: on</div>
+  </div>
+
+  <canvas id="scene"></canvas>
+  <script type="importmap">
+{
+  "imports": {
+    "three": "./js/three.module.js"
+  }
+}
+</script>
+  <script type="module">
+    import * as THREE from "three";
+
+    const canvas = document.getElementById("scene");
+    const statusEl = document.getElementById("status");
+    const hornButton = document.getElementById("hornButton");
+
+    const renderer = new THREE.WebGLRenderer({
+      canvas,
+      antialias: true
+    });
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.shadowMap.enabled = true;
+    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    renderer.outputColorSpace = THREE.SRGBColorSpace;
+
+    const scene = new THREE.Scene();
+    scene.background = new THREE.Color(0x10202d);
+    scene.fog = new THREE.Fog(0x10202d, 18, 60);
+
+    const camera = new THREE.PerspectiveCamera(52, window.innerWidth / window.innerHeight, 0.1, 120);
+    scene.add(camera);
+
+    const ambientLight = new THREE.HemisphereLight(0xcfe8ff, 0x20313e, 1.2);
+    scene.add(ambientLight);
+
+    const fillLight = new THREE.DirectionalLight(0xffffff, 0.55);
+    fillLight.position.set(-8, 10, -6);
+    scene.add(fillLight);
+
+    const pointLight = new THREE.PointLight(0xfff0c6, 6, 45, 2.0);
+    pointLight.castShadow = true;
+    pointLight.shadow.mapSize.set(1024, 1024);
+    pointLight.shadow.bias = -0.0002;
+    scene.add(pointLight);
+
+    const lightOrb = new THREE.Mesh(
+      new THREE.SphereGeometry(0.25, 18, 18),
+      new THREE.MeshBasicMaterial({ color: 0xffdf8d })
+    );
+    scene.add(lightOrb);
+
+    const lightTrail = new THREE.Mesh(
+      new THREE.TorusGeometry(9, 0.03, 10, 120),
+      new THREE.MeshBasicMaterial({ color: 0x7ce0f5, transparent: true, opacity: 0.28 })
+    );
+    lightTrail.rotation.x = Math.PI / 2;
+    scene.add(lightTrail);
+
+    function createBodyTexture() {
+      const texCanvas = document.createElement("canvas");
+      texCanvas.width = 1024;
+      texCanvas.height = 512;
+      const ctx = texCanvas.getContext("2d");
+
+      const bg = ctx.createLinearGradient(0, 0, texCanvas.width, texCanvas.height);
+      bg.addColorStop(0, "#f15a24");
+      bg.addColorStop(0.45, "#dd4b2d");
+      bg.addColorStop(1, "#862d26");
+      ctx.fillStyle = bg;
+      ctx.fillRect(0, 0, texCanvas.width, texCanvas.height);
+
+      ctx.fillStyle = "rgba(255,255,255,0.15)";
+      for (let i = 0; i < 18; i += 1) {
+        ctx.fillRect(0, i * 32, texCanvas.width, 14);
+      }
+
+      ctx.fillStyle = "#ffe6b8";
+      ctx.fillRect(0, 62, texCanvas.width, 16);
+      ctx.fillRect(0, 420, texCanvas.width, 28);
+
+      ctx.strokeStyle = "rgba(12, 22, 28, 0.45)";
+      ctx.lineWidth = 6;
+      for (let i = 0; i <= 8; i += 1) {
+        const x = 80 + i * 110;
+        ctx.beginPath();
+        ctx.moveTo(x, 100);
+        ctx.lineTo(x, 400);
+        ctx.stroke();
+      }
+
+      ctx.fillStyle = "rgba(12, 22, 28, 0.3)";
+      for (let y = 120; y <= 360; y += 60) {
+        ctx.fillRect(40, y, texCanvas.width - 80, 6);
+      }
+
+      ctx.fillStyle = "#122534";
+      ctx.font = "bold 84px Trebuchet MS";
+      ctx.fillText("ROADLINE LOGISTICS", 72, 230);
+      ctx.font = "bold 46px Trebuchet MS";
+      ctx.fillText("HEAVY FREIGHT DIVISION", 78, 294);
+
+      ctx.strokeStyle = "rgba(255,255,255,0.5)";
+      ctx.lineWidth = 2;
+      for (let i = 0; i < 42; i += 1) {
+        const x = 24 + i * 24;
+        const y = 456 + ((i % 2) * 10);
+        ctx.beginPath();
+        ctx.arc(x, y, 3, 0, Math.PI * 2);
+        ctx.stroke();
+      }
+
+      const texture = new THREE.CanvasTexture(texCanvas);
+      texture.wrapS = THREE.RepeatWrapping;
+      texture.wrapT = THREE.RepeatWrapping;
+      texture.repeat.set(1.6, 1.1);
+      texture.anisotropy = renderer.capabilities.getMaxAnisotropy();
+      return texture;
+    }
+
+    function createWheelTexture() {
+      const texCanvas = document.createElement("canvas");
+      texCanvas.width = 768;
+      texCanvas.height = 768;
+      const ctx = texCanvas.getContext("2d");
+
+      ctx.fillStyle = "#1e2229";
+      ctx.fillRect(0, 0, texCanvas.width, texCanvas.height);
+
+      for (let i = 0; i < 36; i += 1) {
+        const x = i * 22;
+        ctx.fillStyle = i % 2 === 0 ? "#39414b" : "#12161c";
+        ctx.fillRect(x, 0, 10, texCanvas.height);
+      }
+
+      ctx.strokeStyle = "rgba(255,255,255,0.08)";
+      ctx.lineWidth = 18;
+      ctx.beginPath();
+      ctx.arc(384, 384, 250, 0, Math.PI * 2);
+      ctx.stroke();
+
+      ctx.lineWidth = 8;
+      ctx.strokeStyle = "rgba(255,255,255,0.2)";
+      ctx.beginPath();
+      ctx.arc(384, 384, 180, 0, Math.PI * 2);
+      ctx.stroke();
+
+      ctx.fillStyle = "#8ea5b5";
+      for (let i = 0; i < 10; i += 1) {
+        const angle = (i / 10) * Math.PI * 2;
+        ctx.save();
+        ctx.translate(384, 384);
+        ctx.rotate(angle);
+        ctx.fillRect(32, -18, 120, 36);
+        ctx.restore();
+      }
+
+      ctx.fillStyle = "#ced8e1";
+      ctx.beginPath();
+      ctx.arc(384, 384, 84, 0, Math.PI * 2);
+      ctx.fill();
+
+      const texture = new THREE.CanvasTexture(texCanvas);
+      texture.wrapS = THREE.RepeatWrapping;
+      texture.wrapT = THREE.RepeatWrapping;
+      texture.repeat.set(2.2, 1.0);
+      texture.anisotropy = renderer.capabilities.getMaxAnisotropy();
+      return texture;
+    }
+
+    function createRoadTexture() {
+      const texCanvas = document.createElement("canvas");
+      texCanvas.width = 1024;
+      texCanvas.height = 1024;
+      const ctx = texCanvas.getContext("2d");
+
+      ctx.fillStyle = "#2c3339";
+      ctx.fillRect(0, 0, 1024, 1024);
+
+      for (let i = 0; i < 1400; i += 1) {
+        const shade = 40 + Math.random() * 40;
+        ctx.fillStyle = `rgba(${shade},${shade},${shade},0.18)`;
+        ctx.fillRect(Math.random() * 1024, Math.random() * 1024, 3 + Math.random() * 5, 3 + Math.random() * 5);
+      }
+
+      ctx.fillStyle = "#f5f0be";
+      for (let i = 0; i < 12; i += 1) {
+        ctx.fillRect(496, i * 96 + 20, 32, 54);
+      }
+
+      const texture = new THREE.CanvasTexture(texCanvas);
+      texture.wrapS = THREE.RepeatWrapping;
+      texture.wrapT = THREE.RepeatWrapping;
+      texture.repeat.set(4, 12);
+      texture.anisotropy = renderer.capabilities.getMaxAnisotropy();
+      return texture;
+    }
+
+    const bodyTexture = createBodyTexture();
+    const wheelTexture = createWheelTexture();
+    const roadTexture = createRoadTexture();
+
+    const sharedVertexShader = `
+      varying vec2 vUv;
+      varying vec3 vViewPosition;
+      varying vec3 vViewNormal;
+
+      void main() {
+        vUv = uv;
+        vec4 mvPosition = modelViewMatrix * vec4(position, 1.0);
+        vViewPosition = mvPosition.xyz;
+        vViewNormal = normalize(normalMatrix * normal);
+        gl_Position = projectionMatrix * mvPosition;
+      }
+    `;
+
+    const bodyFragmentShader = `
+      uniform sampler2D uMap;
+      uniform vec3 uLightPosView;
+      uniform vec3 uLightColor;
+      uniform vec3 uAmbientColor;
+      uniform vec3 uSpecularColor;
+      varying vec2 vUv;
+      varying vec3 vViewPosition;
+      varying vec3 vViewNormal;
+
+      void main() {
+        vec3 base = texture2D(uMap, vUv).rgb;
+        vec3 normal = normalize(vViewNormal);
+        vec3 lightDir = normalize(uLightPosView - vViewPosition);
+        vec3 viewDir = normalize(-vViewPosition);
+        float diffuse = max(dot(normal, lightDir), 0.0);
+        vec3 halfVector = normalize(lightDir + viewDir);
+        float specular = pow(max(dot(normal, halfVector), 0.0), 36.0) * step(0.0, diffuse);
+        float rim = pow(1.0 - max(dot(normal, viewDir), 0.0), 2.3);
+        vec3 color = base * (uAmbientColor + diffuse * uLightColor);
+        color += specular * uSpecularColor;
+        color += rim * 0.07 * uLightColor;
+        gl_FragColor = vec4(color, 1.0);
+      }
+    `;
+
+    const wheelFragmentShader = `
+      uniform sampler2D uMap;
+      uniform vec3 uLightPosView;
+      uniform vec3 uLightColor;
+      uniform vec3 uAmbientColor;
+      varying vec2 vUv;
+      varying vec3 vViewPosition;
+      varying vec3 vViewNormal;
+
+      void main() {
+        vec2 uv = vUv * vec2(1.0, 1.8);
+        vec3 tex = texture2D(uMap, uv).rgb;
+        float tread = 0.5 + 0.5 * sin(vUv.x * 90.0);
+        tex *= mix(0.78, 1.03, tread);
+        vec3 normal = normalize(vViewNormal);
+        vec3 lightDir = normalize(uLightPosView - vViewPosition);
+        vec3 viewDir = normalize(-vViewPosition);
+        float diffuse = max(dot(normal, lightDir), 0.0);
+        float edge = pow(1.0 - max(dot(normal, viewDir), 0.0), 3.0);
+        vec3 color = tex * (uAmbientColor + diffuse * uLightColor * 0.95);
+        color += edge * 0.18 * vec3(0.85, 0.9, 1.0);
+        gl_FragColor = vec4(color, 1.0);
+      }
+    `;
+
+    function makeShaderUniforms(texture) {
+      return {
+        uMap: { value: texture },
+        uLightPosView: { value: new THREE.Vector3() },
+        uLightColor: { value: new THREE.Color(1.0, 0.92, 0.76) },
+        uAmbientColor: { value: new THREE.Color(0.26, 0.29, 0.36) },
+        uSpecularColor: { value: new THREE.Color(1.0, 0.95, 0.88) }
+      };
+    }
+
+    const bodyMaterial = new THREE.ShaderMaterial({
+      uniforms: makeShaderUniforms(bodyTexture),
+      vertexShader: sharedVertexShader,
+      fragmentShader: bodyFragmentShader
+    });
+
+    const wheelMaterial = new THREE.ShaderMaterial({
+      uniforms: makeShaderUniforms(wheelTexture),
+      vertexShader: sharedVertexShader,
+      fragmentShader: wheelFragmentShader
+    });
+
+    const metalMaterial = new THREE.MeshStandardMaterial({
+      color: 0x929ca5,
+      metalness: 0.72,
+      roughness: 0.28
+    });
+
+    const glassMaterial = new THREE.MeshStandardMaterial({
+      color: 0x99d6f7,
+      emissive: 0x0a2230,
+      metalness: 0.08,
+      roughness: 0.1,
+      transparent: true,
+      opacity: 0.72
+    });
+
+    const headlightMaterial = new THREE.MeshStandardMaterial({
+      color: 0xfff7d2,
+      emissive: 0xfff0a5,
+      emissiveIntensity: 1.1,
+      roughness: 0.18,
+      metalness: 0.2
+    });
+
+    function createRoadStripGeometry(curve, innerOffset, outerOffset, yOffset = 0, segments = 180) {
+      const points = curve.getPoints(segments);
+      const positions = [];
+      const normals = [];
+      const uvs = [];
+      const indices = [];
+      let distance = 0;
+      const distances = [0];
+
+      for (let i = 1; i < points.length; i += 1) {
+        distance += points[i].distanceTo(points[i - 1]);
+        distances.push(distance);
+      }
+
+      for (let i = 0; i < points.length; i += 1) {
+        const prev = points[Math.max(i - 1, 0)];
+        const next = points[Math.min(i + 1, points.length - 1)];
+        const tangent = next.clone().sub(prev).setY(0).normalize();
+        const lateral = new THREE.Vector3(-tangent.z, 0, tangent.x);
+
+        const inner = points[i].clone().addScaledVector(lateral, innerOffset);
+        const outer = points[i].clone().addScaledVector(lateral, outerOffset);
+        inner.y = yOffset;
+        outer.y = yOffset;
+
+        positions.push(inner.x, inner.y, inner.z, outer.x, outer.y, outer.z);
+        normals.push(0, 1, 0, 0, 1, 0);
+
+        const v = distance === 0 ? 0 : distances[i] / distance;
+        uvs.push(0, v, 1, v);
+      }
+
+      for (let i = 0; i < points.length - 1; i += 1) {
+        const base = i * 2;
+        indices.push(base, base + 1, base + 2, base + 1, base + 3, base + 2);
+      }
+
+      const geometry = new THREE.BufferGeometry();
+      geometry.setAttribute("position", new THREE.Float32BufferAttribute(positions, 3));
+      geometry.setAttribute("normal", new THREE.Float32BufferAttribute(normals, 3));
+      geometry.setAttribute("uv", new THREE.Float32BufferAttribute(uvs, 2));
+      geometry.setIndex(indices);
+      return geometry;
+    }
+
+    const roadCurve = new THREE.CatmullRomCurve3(
+      [
+        new THREE.Vector3(-90, 0, -2),
+        new THREE.Vector3(-48, 0, -2),
+        new THREE.Vector3(-12, 0, 0),
+        new THREE.Vector3(28, 0, 12),
+        new THREE.Vector3(68, 0, 14),
+        new THREE.Vector3(110, 0, -10)
+      ],
+      false,
+      "catmullrom",
+      0.16
+    );
+
+    const roadHalfWidth = 8.8;
+    const shoulderWidth = 2.6;
+
+    const road = new THREE.Mesh(
+      createRoadStripGeometry(roadCurve, -roadHalfWidth, roadHalfWidth),
+      new THREE.MeshStandardMaterial({ map: roadTexture, roughness: 0.9, metalness: 0.02 })
+    );
+    road.receiveShadow = true;
+    scene.add(road);
+
+    const shoulderMaterial = new THREE.MeshStandardMaterial({
+      color: 0x54646f,
+      roughness: 0.95
+    });
+
+    const leftShoulder = new THREE.Mesh(
+      createRoadStripGeometry(roadCurve, -(roadHalfWidth + shoulderWidth), -roadHalfWidth, -0.03),
+      shoulderMaterial
+    );
+    leftShoulder.receiveShadow = true;
+    scene.add(leftShoulder);
+
+    const rightShoulder = new THREE.Mesh(
+      createRoadStripGeometry(roadCurve, roadHalfWidth, roadHalfWidth + shoulderWidth, -0.03),
+      shoulderMaterial
+    );
+    rightShoulder.receiveShadow = true;
+    scene.add(rightShoulder);
+
+    const ground = new THREE.Mesh(
+      new THREE.CircleGeometry(70, 80),
+      new THREE.MeshStandardMaterial({ color: 0x5c7452, roughness: 1.0 })
+    );
+    ground.rotation.x = -Math.PI / 2;
+    ground.position.y = -0.09;
+    ground.receiveShadow = true;
+    scene.add(ground);
+
+    function addBodyPart(parent, geometry, position, scale = [1, 1, 1]) {
+      const mesh = new THREE.Mesh(geometry, bodyMaterial);
+      mesh.position.copy(position);
+      mesh.scale.set(scale[0], scale[1], scale[2]);
+      mesh.castShadow = true;
+      mesh.receiveShadow = true;
+      parent.add(mesh);
+      return mesh;
+    }
+
+    const truck = new THREE.Group();
+    scene.add(truck);
+
+    const frame = new THREE.Group();
+    frame.position.y = 0.1;
+    truck.add(frame);
+
+    const box = new THREE.BoxGeometry(1, 1, 1);
+
+    addBodyPart(frame, box, new THREE.Vector3(-0.6, 1.45, 0), [4.6, 1.9, 2.5]);
+    addBodyPart(frame, box, new THREE.Vector3(2.9, 1.38, 0), [2.2, 1.55, 2.35]);
+    addBodyPart(frame, box, new THREE.Vector3(3.55, 2.25, 0), [1.15, 1.0, 2.15]);
+    addBodyPart(frame, box, new THREE.Vector3(0.6, 2.35, 0), [2.05, 0.45, 2.42]);
+    addBodyPart(frame, box, new THREE.Vector3(1.45, 0.78, 0), [6.4, 0.44, 2.1]);
+
+    const bumper = new THREE.Mesh(new THREE.BoxGeometry(0.35, 0.44, 2.15), metalMaterial);
+    bumper.position.set(4.16, 0.92, 0);
+    bumper.castShadow = true;
+    frame.add(bumper);
+
+    const grille = new THREE.Mesh(new THREE.BoxGeometry(0.22, 1.05, 1.64), metalMaterial);
+    grille.position.set(4.08, 1.48, 0);
+    grille.castShadow = true;
+    frame.add(grille);
+
+    const windshield = new THREE.Mesh(new THREE.PlaneGeometry(1.18, 1.02), glassMaterial);
+    windshield.position.set(3.48, 2.24, 0);
+    windshield.rotation.y = -Math.PI / 2;
+    frame.add(windshield);
+
+    const sideWindowLeft = new THREE.Mesh(new THREE.PlaneGeometry(1.12, 0.72), glassMaterial);
+    sideWindowLeft.position.set(3.36, 2.25, 1.09);
+    frame.add(sideWindowLeft);
+
+    const sideWindowRight = sideWindowLeft.clone();
+    sideWindowRight.position.z = -1.09;
+    sideWindowRight.rotation.y = Math.PI;
+    frame.add(sideWindowRight);
+
+    const lightLeft = new THREE.Mesh(new THREE.BoxGeometry(0.18, 0.28, 0.42), headlightMaterial);
+    lightLeft.position.set(4.24, 1.2, 0.72);
+    frame.add(lightLeft);
+
+    const lightRight = lightLeft.clone();
+    lightRight.position.z = -0.72;
+    frame.add(lightRight);
+
+    const frontPipe = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.1, 0.95, 20), metalMaterial);
+    frontPipe.rotation.z = -Math.PI / 2;
+    frontPipe.position.set(4.45, 1.82, 0.98);
+    frontPipe.castShadow = true;
+    frame.add(frontPipe);
+
+    const frontPipeTip = new THREE.Object3D();
+    frontPipeTip.position.set(4.96, 1.82, 0.98);
+    frame.add(frontPipeTip);
+
+    const exhaust = new THREE.Mesh(new THREE.CylinderGeometry(0.09, 0.12, 1.55, 20), metalMaterial);
+    exhaust.position.set(1.95, 2.55, -1.04);
+    exhaust.castShadow = true;
+    frame.add(exhaust);
+
+    const roofStrip = new THREE.Mesh(new THREE.BoxGeometry(2.25, 0.1, 2.44), metalMaterial);
+    roofStrip.position.set(0.55, 2.62, 0);
+    roofStrip.castShadow = true;
+    frame.add(roofStrip);
+
+    const wheelRadius = 0.62;
+    const wheelThickness = 0.52;
+    const wheelGeometry = new THREE.CylinderGeometry(wheelRadius, wheelRadius, wheelThickness, 32, 1, false);
+
+    const steeringPivots = [];
+    const wheelSpinNodes = [];
+
+    function createWheelAssembly(x, z, steerable) {
+      const steeringPivot = new THREE.Group();
+      steeringPivot.position.set(x, wheelRadius, z);
+      truck.add(steeringPivot);
+
+      const spinNode = new THREE.Group();
+      steeringPivot.add(spinNode);
+
+      const tire = new THREE.Mesh(wheelGeometry, wheelMaterial);
+      tire.rotation.x = Math.PI / 2;
+      tire.castShadow = true;
+      tire.receiveShadow = true;
+      spinNode.add(tire);
+
+      const hub = new THREE.Mesh(new THREE.CylinderGeometry(0.28, 0.28, wheelThickness + 0.04, 24), metalMaterial);
+      hub.rotation.x = Math.PI / 2;
+      hub.castShadow = true;
+      spinNode.add(hub);
+
+      if (steerable) {
+        steeringPivots.push(steeringPivot);
+      }
+      wheelSpinNodes.push(spinNode);
+    }
+
+    createWheelAssembly(2.85, 1.34, true);
+    createWheelAssembly(2.85, -1.34, true);
+    createWheelAssembly(-0.55, 1.34, false);
+    createWheelAssembly(-0.55, -1.34, false);
+    createWheelAssembly(-3.15, 1.34, false);
+    createWheelAssembly(-3.15, -1.34, false);
+
+    const axleMaterial = new THREE.MeshStandardMaterial({ color: 0x444d56, roughness: 0.78 });
+
+    function createAxle(x) {
+      const axle = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.06, 2.55, 16), axleMaterial);
+      axle.rotation.z = Math.PI / 2;
+      axle.position.set(x, wheelRadius + 0.02, 0);
+      axle.castShadow = true;
+      truck.add(axle);
+    }
+
+    createAxle(2.85);
+    createAxle(-0.55);
+    createAxle(-3.15);
+
+    const laneMarker = new THREE.Mesh(
+      new THREE.RingGeometry(8.92, 9.06, 128),
+      new THREE.MeshBasicMaterial({ color: 0xffd877, transparent: true, opacity: 0.08, side: THREE.DoubleSide })
+    );
+    laneMarker.rotation.x = -Math.PI / 2;
+    laneMarker.position.y = 0.02;
+    scene.add(laneMarker);
+
+    const state = {
+      speed: 0,
+      heading: 0,
+      steer: 0,
+      hornActive: false,
+      hornKeyActive: false,
+      hornPointerActive: false,
+      hornEmitTimer: 0,
+      autoCamera: true,
+      autoLight: true,
+      cameraOrbitAngle: 0.2,
+      lightOrbitAngle: 0.6,
+      cameraYawOffset: 0.55,
+      cameraPitch: 0.32,
+      cameraDistance: 13,
+      dragging: false,
+      lastPointerX: 0,
+      lastPointerY: 0
+    };
+
+    const keys = {};
+    const clock = new THREE.Clock();
+    const tempLightPos = new THREE.Vector3();
+    const truckDirection = new THREE.Vector3();
+    const truckTarget = new THREE.Vector3();
+    const smokeOrigin = new THREE.Vector3();
+    const smokeDirection = new THREE.Vector3();
+    const smokeQuaternion = new THREE.Quaternion();
+    const smokeLateral = new THREE.Vector3();
+
+    const smokeGroup = new THREE.Group();
+    scene.add(smokeGroup);
+
+    const smokeGeometry = new THREE.SphereGeometry(0.18, 14, 14);
+    const smokeParticles = [];
+    for (let i = 0; i < 30; i += 1) {
+      const material = new THREE.MeshBasicMaterial({
+        color: 0x161616,
+        transparent: true,
+        opacity: 0,
+        depthWrite: false
+      });
+      const mesh = new THREE.Mesh(smokeGeometry, material);
+      mesh.visible = false;
+      smokeGroup.add(mesh);
+      smokeParticles.push({
+        mesh,
+        velocity: new THREE.Vector3(),
+        life: 0,
+        maxLife: 1,
+        baseScale: 0.5
+      });
+    }
+
+    function updateStatus() {
+      statusEl.textContent =
+        `Auto camera: ${state.autoCamera ? "on" : "off"} | Rotating light: ${state.autoLight ? "on" : "off"}`;
+    }
+
+    function syncHornState() {
+      state.hornActive = state.hornKeyActive || state.hornPointerActive;
+      hornButton.classList.toggle("active", state.hornActive);
+    }
+
+    function clearSmoke() {
+      state.hornEmitTimer = 0;
+      for (const particle of smokeParticles) {
+        particle.life = 0;
+        particle.mesh.visible = false;
+        particle.mesh.material.opacity = 0;
+      }
+    }
+
+    function emitSmokeBurst(count = 2) {
+      frontPipeTip.getWorldPosition(smokeOrigin);
+      frontPipeTip.getWorldQuaternion(smokeQuaternion);
+      smokeDirection.set(1, 0, 0).applyQuaternion(smokeQuaternion).normalize();
+      smokeLateral.set(0, 0, 1).applyQuaternion(smokeQuaternion).normalize();
+
+      for (let i = 0; i < count; i += 1) {
+        const particle = smokeParticles.find((item) => item.life <= 0);
+        if (!particle) {
+          return;
+        }
+
+        const sideDrift = (Math.random() - 0.5) * 0.45;
+        particle.life = 0.7 + Math.random() * 0.45;
+        particle.maxLife = particle.life;
+        particle.baseScale = 0.45 + Math.random() * 0.18;
+        particle.mesh.visible = true;
+        particle.mesh.position.copy(smokeOrigin)
+          .addScaledVector(smokeDirection, 0.16 + Math.random() * 0.14)
+          .addScaledVector(smokeLateral, sideDrift * 0.12);
+        particle.mesh.scale.setScalar(particle.baseScale);
+        particle.mesh.material.opacity = 0.55;
+        particle.velocity.copy(smokeDirection).multiplyScalar(1.6 + Math.random() * 0.65);
+        particle.velocity.addScaledVector(smokeLateral, sideDrift);
+        particle.velocity.y += 0.55 + Math.random() * 0.45;
+      }
+    }
+
+    function updateSmoke(dt) {
+      if (state.hornActive) {
+        state.hornEmitTimer -= dt;
+        while (state.hornEmitTimer <= 0) {
+          emitSmokeBurst(2);
+          state.hornEmitTimer += 0.04;
+        }
+      } else {
+        state.hornEmitTimer = 0;
+      }
+
+      for (const particle of smokeParticles) {
+        if (particle.life <= 0) {
+          continue;
+        }
+
+        particle.life -= dt;
+        if (particle.life <= 0) {
+          particle.mesh.visible = false;
+          particle.mesh.material.opacity = 0;
+          continue;
+        }
+
+        const age = 1 - particle.life / particle.maxLife;
+        particle.velocity.y += dt * 0.42;
+        particle.velocity.multiplyScalar(0.992);
+        particle.mesh.position.addScaledVector(particle.velocity, dt);
+        particle.mesh.scale.setScalar(particle.baseScale + age * 0.9);
+        particle.mesh.material.opacity = (1 - age) * 0.55;
+      }
+    }
+
+    function resetSceneState() {
+      state.speed = 0;
+      state.heading = 0;
+      state.steer = 0;
+      state.hornKeyActive = false;
+      state.hornPointerActive = false;
+      state.autoCamera = true;
+      state.autoLight = true;
+      state.cameraOrbitAngle = 0.2;
+      state.lightOrbitAngle = 0.6;
+      state.cameraYawOffset = 0.55;
+      state.cameraPitch = 0.32;
+      state.cameraDistance = 13;
+      truck.position.set(0, 0, 0);
+      truck.rotation.set(0, 0, 0);
+      syncHornState();
+      clearSmoke();
+      updateStatus();
+    }
+
+    function updateTruck(dt) {
+      const forward = (keys["KeyW"] || keys["ArrowUp"] ? 1 : 0) - (keys["KeyS"] || keys["ArrowDown"] ? 1 : 0);
+      const turn = (keys["KeyD"] || keys["ArrowRight"] ? 1 : 0) - (keys["KeyA"] || keys["ArrowLeft"] ? 1 : 0);
+      const braking = keys["Space"] ? 1 : 0;
+
+      const acceleration = forward * 4.8;
+      state.speed += acceleration * dt;
+      state.speed *= braking ? 0.88 : 0.985;
+      state.speed = THREE.MathUtils.clamp(state.speed, -4.5, 8.5);
+
+      const steerTarget = THREE.MathUtils.clamp(turn * 0.48, -0.48, 0.48);
+      state.steer = THREE.MathUtils.lerp(state.steer, steerTarget, Math.min(1, dt * 6));
+      state.heading += state.steer * state.speed * dt * 0.22;
+
+      truckDirection.set(Math.cos(state.heading), 0, Math.sin(state.heading));
+      truck.position.addScaledVector(truckDirection, state.speed * dt);
+      truck.rotation.y = -state.heading;
+
+      for (const pivot of steeringPivots) {
+        pivot.rotation.y = -state.steer;
+      }
+
+      const wheelSpin = state.speed * dt / wheelRadius;
+      for (const spinNode of wheelSpinNodes) {
+        spinNode.rotation.z -= wheelSpin;
+      }
+    }
+
+    function updateCamera(dt) {
+      if (state.autoCamera) {
+        state.cameraOrbitAngle += dt * 0.3;
+      }
+
+      truckTarget.set(truck.position.x, truck.position.y + 1.9, truck.position.z);
+      const yaw = state.cameraOrbitAngle + state.cameraYawOffset;
+      const pitch = state.cameraPitch;
+      const radius = state.cameraDistance;
+
+      camera.position.set(
+        truckTarget.x + Math.cos(yaw) * Math.cos(pitch) * radius,
+        truckTarget.y + Math.sin(pitch) * radius,
+        truckTarget.z + Math.sin(yaw) * Math.cos(pitch) * radius
+      );
+
+      camera.lookAt(truckTarget);
+      camera.updateMatrixWorld();
+      camera.matrixWorldInverse.copy(camera.matrixWorld).invert();
+    }
+
+    function updateLight(dt) {
+      if (state.autoLight) {
+        state.lightOrbitAngle += dt * 0.8;
+      }
+
+      const angle = state.lightOrbitAngle;
+      const orbitRadius = 9.0;
+      const center = truck.position;
+
+      pointLight.position.set(
+        center.x + Math.cos(angle) * orbitRadius,
+        5.2 + Math.sin(angle * 1.4) * 1.0,
+        center.z + Math.sin(angle) * orbitRadius
+      );
+      lightOrb.position.copy(pointLight.position);
+      lightTrail.position.set(center.x, 0.05, center.z);
+      laneMarker.position.set(center.x, 0.02, center.z);
+    }
+
+    function updateShaderUniforms() {
+      tempLightPos.copy(pointLight.position).applyMatrix4(camera.matrixWorldInverse);
+      bodyMaterial.uniforms.uLightPosView.value.copy(tempLightPos);
+      wheelMaterial.uniforms.uLightPosView.value.copy(tempLightPos);
+    }
+
+    function animate() {
+      const dt = Math.min(clock.getDelta(), 0.033);
+      updateTruck(dt);
+      updateCamera(dt);
+      updateLight(dt);
+      updateSmoke(dt);
+      updateShaderUniforms();
+      renderer.render(scene, camera);
+    }
+
+    canvas.addEventListener("pointerdown", (event) => {
+      state.dragging = true;
+      state.lastPointerX = event.clientX;
+      state.lastPointerY = event.clientY;
+      canvas.setPointerCapture(event.pointerId);
+    });
+
+    canvas.addEventListener("pointermove", (event) => {
+      if (!state.dragging) {
+        return;
+      }
+
+      const dx = event.clientX - state.lastPointerX;
+      const dy = event.clientY - state.lastPointerY;
+      state.lastPointerX = event.clientX;
+      state.lastPointerY = event.clientY;
+      state.cameraYawOffset -= dx * 0.005;
+      state.cameraPitch = THREE.MathUtils.clamp(state.cameraPitch - dy * 0.004, -0.05, 1.15);
+    });
+
+    canvas.addEventListener("pointerup", (event) => {
+      state.dragging = false;
+      if (canvas.hasPointerCapture(event.pointerId)) {
+        canvas.releasePointerCapture(event.pointerId);
+      }
+    });
+
+    canvas.addEventListener("pointercancel", () => {
+      state.dragging = false;
+    });
+
+    canvas.addEventListener("pointerleave", () => {
+      state.dragging = false;
+    });
+
+    canvas.addEventListener("wheel", (event) => {
+      event.preventDefault();
+      state.cameraDistance = THREE.MathUtils.clamp(state.cameraDistance + event.deltaY * 0.01, 6, 24);
+    }, { passive: false });
+
+    hornButton.addEventListener("pointerdown", (event) => {
+      event.preventDefault();
+      state.hornPointerActive = true;
+      syncHornState();
+    });
+
+    hornButton.addEventListener("pointerup", () => {
+      state.hornPointerActive = false;
+      syncHornState();
+    });
+
+    hornButton.addEventListener("pointerleave", () => {
+      state.hornPointerActive = false;
+      syncHornState();
+    });
+
+    hornButton.addEventListener("pointercancel", () => {
+      state.hornPointerActive = false;
+      syncHornState();
+    });
+
+    window.addEventListener("keydown", (event) => {
+      if (["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight", "Space"].includes(event.code)) {
+        event.preventDefault();
+      }
+
+      keys[event.code] = true;
+
+      if (event.code === "KeyC" && !event.repeat) {
+        state.autoCamera = !state.autoCamera;
+        updateStatus();
+      }
+
+      if (event.code === "KeyL" && !event.repeat) {
+        state.autoLight = !state.autoLight;
+        updateStatus();
+      }
+
+      if (event.code === "KeyR" && !event.repeat) {
+        resetSceneState();
+      }
+
+      if (event.code === "KeyH") {
+        state.hornKeyActive = true;
+        syncHornState();
+      }
+    });
+
+    window.addEventListener("keyup", (event) => {
+      if (["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight", "Space"].includes(event.code)) {
+        event.preventDefault();
+      }
+
+      keys[event.code] = false;
+
+      if (event.code === "KeyH") {
+        state.hornKeyActive = false;
+        syncHornState();
+      }
+    });
+
+    window.addEventListener("resize", () => {
+      camera.aspect = window.innerWidth / window.innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(window.innerWidth, window.innerHeight);
+      renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    });
+
+    resetSceneState();
+    renderer.setAnimationLoop(animate);
+  </script>
+</body>
+</html>
